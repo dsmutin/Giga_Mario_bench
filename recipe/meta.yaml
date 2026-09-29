@@ -1,0 +1,35 @@
+{% set version = load_file_contents("VERSION").strip() %}
+
+package:
+  name: giga_mario_bench
+  version: {{ version }}
+
+source:
+  path: ..
+
+build:
+  noarch: python
+  number: 0
+  script: {{ PYTHON }} -m pip install . -vv --no-deps --no-build-isolation
+  entry_points:
+    - giga_mario_bench = giga_mario_bench.cli:main
+
+requirements:
+  host:
+    - python 3.12
+    - pip
+    - setuptools
+  run:
+    - python 3.12
+
+test:
+  imports:
+    - giga_mario_bench
+  commands:
+    - giga_mario_bench --version
+
+about:
+  home: https://github.com/dsmutin/Giga_Mario_bench
+  license: MIT
+  license_file: LICENSE
+  summary: "Benchmarks of data-split methods for in silico ligand hypotheses, with shared models and scores."

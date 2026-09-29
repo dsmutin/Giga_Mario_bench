@@ -1,0 +1,10 @@
+name: giga_mario_bench
+channels:
+  - conda-forge
+dependencies:
+  - python=3.12
+  - setuptools
+  - pytest
+  - pytest-cov
+variables:
+  PYTHONPATH: src

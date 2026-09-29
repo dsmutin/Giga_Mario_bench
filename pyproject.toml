@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "giga_mario_bench"
+dynamic = ["version"]
+description = "Benchmarks of data-split methods for in silico ligand hypotheses, with shared models and scores."
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.12"
+
+[project.scripts]
+giga_mario_bench = "giga_mario_bench.cli:main"
+
+[tool.setuptools.dynamic]
+version = { file = "VERSION" }
+
+[tool.setuptools.packages.find]
+where = ["src"]

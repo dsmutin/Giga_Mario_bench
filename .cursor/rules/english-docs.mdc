@@ -1,0 +1,10 @@
+---
+description: English short documentation required on all public APIs and data
+alwaysApply: true
+---
+
+# English documentation
+
+Every public function, class, module, CLI flag, dataset, and user-facing file must have **short English** documentation (docstring, comment, or README).
+
+Other languages or missing documentation are **not allowed**.

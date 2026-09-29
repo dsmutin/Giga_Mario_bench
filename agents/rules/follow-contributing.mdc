@@ -1,0 +1,14 @@
+---
+description: Follow CONTRIBUTING.md for architecture, tests, versioning, and todo.md
+alwaysApply: true
+---
+
+# Follow the contribution guide
+
+Any development in this repository must follow `CONTRIBUTING.md`:
+
+- architecture and testing layout
+- `todo.md` as the feature checklist
+- pytest mandatory vs optional
+- mandatory tests after every new feature
+- version bumps only in `VERSION` (feature = minor, fix = patch, release = major)

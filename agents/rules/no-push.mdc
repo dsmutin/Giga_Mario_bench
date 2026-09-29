@@ -1,0 +1,10 @@
+---
+description: Do not git push unless the human explicitly asks
+alwaysApply: true
+---
+
+# No push
+
+Do not run `git push`, `git push --force`, or any command that publishes commits to a remote.
+
+Adding a remote, committing locally, and opening a PR URL for the human is allowed. Push only when the user explicitly asks to push.

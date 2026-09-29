@@ -1,0 +1,49 @@
+name: full tests
+
+# Optional pytest, toy example, and vignettes/examples.
+# Not used on ordinary push/PR (those run required-tests.yml).
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+concurrency:
+  group: full-tests
+  cancel-in-progress: false
+
+jobs:
+  full:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    defaults:
+      run:
+        shell: bash -l {0}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: conda-incubator/setup-miniconda@v3
+        with:
+          python-version: "3.12"
+          auto-update-conda: true
+          activate-environment: giga_mario_bench
+          environment-file: environment.yml
+      - name: All pytest (mandatory and optional)
+        timeout-minutes: 30
+        run: pytest --tb=short
+      - name: Toy example
+        timeout-minutes: 15
+        run: python examples/toy/run.py
+      - name: Extra examples and vignettes
+        timeout-minutes: 60
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          for s in examples/*/run.py examples/*/pipeline.sh; do
+            case "$s" in
+              examples/toy/run.py) continue ;;
+            esac
+            if [[ "$s" == *.py ]]; then python "$s"; else bash "$s"; fi
+          done
+          for s in vignettes/*.sh vignettes/*.py; do
+            if [[ "$s" == *.py ]]; then python "$s"; else bash "$s"; fi
+          done

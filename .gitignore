@@ -1,0 +1,36 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# local test scratch
+testing*/
+
+# nested GitHub wiki clone metadata (markdown under wiki/ is tracked)
+wiki/.git/
+
+# conda / local envs
+.conda/
+conda-bld/
+*.sstate*
+.venv/
+.env
+
+# editors / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# runtime
+.snakemake/
+.Rproj.user/
+*.log

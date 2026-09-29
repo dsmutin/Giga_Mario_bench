@@ -1,0 +1,14 @@
+---
+description: Reproducible runs — pinned versions, seeds, relative paths, recorded commands
+alwaysApply: true
+---
+
+# Reproducibility
+
+- Pin tool and package versions in env files (`environment.yml`, lockfiles). Do not invent version numbers.
+- Record random seeds when used. Prefer relative paths over machine-specific absolute paths.
+- Keep settings in config files (YAML/TOML), not hidden env vars or hard-coded machine paths.
+- Log executed commands and versions when a run is part of the deliverable.
+- Prefer the project conda env over ad-hoc global installs.
+
+Missing pins: report the gap; do not guess versions.

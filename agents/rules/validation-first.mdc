@@ -1,0 +1,12 @@
+---
+description: Fail-early input checks for scientific workflows — paths, metadata, tool versions. Not security or adversarial testing.
+alwaysApply: true
+---
+
+# Validation first
+
+Before running a workflow, confirm required inputs exist and are usable. Fail early with an informative error. No silent failures, swallowed exceptions, or unchecked assumptions.
+
+Check as relevant: paths (exist, readable, non-empty); required metadata columns; sample-ID overlap; table shape; tool versions; writable outputs.
+
+Ordinary fail-early validation — not adversarial, fuzz, or security testing.

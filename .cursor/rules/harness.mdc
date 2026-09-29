@@ -1,0 +1,33 @@
+---
+description: Project harness — tool profile from /start-dev
+alwaysApply: true
+---
+
+# Project harness
+
+**Profile:** tool
+**Initialized:** by `/start-dev`
+
+## Obligatory
+
+- scientific-integrity
+- validation-first
+- reproducibility
+- missing-data-policy
+- english-docs
+- no-push
+- follow-contributing
+
+User-level publication-figures applies when producing plots.
+
+## Disabled unless the user asks
+
+Paper pipeline, `/do` `/prepare` graphs, SLURM, artifact-registry, method-decision (beyond `todo.md` as a **feature checklist**).
+
+## Domain skills
+
+none (portable `agents/skills` only)
+
+## Notes
+
+Conda-only install. Version only in `VERSION`. Mandatory pytest after every feature.

@@ -1,0 +1,12 @@
+---
+description: Stop when required inputs are missing — do not invent data, samples, or results
+alwaysApply: true
+---
+
+# Missing data policy
+
+If a required input, column, accession, or parameter is missing: **stop**, list what is missing, and do not proceed as if it existed.
+
+Search public sources **only when the user asks**. If they did not, report the gap; do not fetch or invent a substitute.
+
+Do not invent samples, values, or placeholder results. Do not silently impute.

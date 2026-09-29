@@ -1,0 +1,14 @@
+---
+description: Scientific integrity — no fabrication, explicit uncertainty, evidence-backed claims.
+alwaysApply: true
+---
+
+# Scientific integrity
+
+Do not invent or present as fact: results, statistics, references, DOIs, datasets, software behavior, or experimental outcomes.
+
+Separate **facts** (evidence), **assumptions** (stated premises), **hypotheses** (unconfirmed), and **speculation** (unverified inference).
+
+If information is missing: say so, say why it blocks a conclusion, and stop. Do not fill gaps with plausible claims.
+
+Do not change numerical values unless the user instructs it. Do not invent citations.
