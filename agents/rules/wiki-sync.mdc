@@ -1,0 +1,17 @@
+---
+description: Update the GitHub wiki with every change that will be committed, and push that wiki
+alwaysApply: true
+---
+
+# Wiki travels with commits
+
+Any change that will be committed in this repository must also update the GitHub wiki checkout at `wiki/`.
+
+`wiki/` is a separate git repository (the GitHub wiki). After editing its pages:
+
+1. Commit the page files in this repository as well, so the change is reviewable with the code.
+2. Commit inside `wiki/` and push that wiki repository to its GitHub remote.
+
+When the human says "исправь вики" or "fix the wiki", edit this GitHub wiki. That phrase does not mean in-package documentation such as `src/**/contract.md` or the README.
+
+The main tool repository is not pushed unless the human asks. The wiki repository may be pushed as soon as its pages change.

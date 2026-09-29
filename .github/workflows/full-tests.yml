@@ -21,6 +21,10 @@ jobs:
         shell: bash -l {0}
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: Sirius-Back/Giga_Mario
+          path: Giga_Mario
       - uses: conda-incubator/setup-miniconda@v3
         with:
           python-version: "3.12"
@@ -29,9 +33,13 @@ jobs:
           environment-file: environment.yml
       - name: All pytest (mandatory and optional)
         timeout-minutes: 30
+        env:
+          GIGA_MARIO_ROOT: ${{ github.workspace }}/Giga_Mario
         run: pytest --tb=short
       - name: Toy example
-        timeout-minutes: 15
+        timeout-minutes: 30
+        env:
+          GIGA_MARIO_ROOT: ${{ github.workspace }}/Giga_Mario
         run: python examples/toy/run.py
       - name: Extra examples and vignettes
         timeout-minutes: 60

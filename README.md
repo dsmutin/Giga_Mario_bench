@@ -11,11 +11,12 @@ Benchmarks of data-split methods for in silico ligand hypotheses, with shared mo
 
 ## Install
 
-Conda is the only supported install:
+Conda is the only supported install. Clone [Giga_Mario](https://github.com/Sirius-Back/Giga_Mario) beside this repository (split methods) and set `GIGA_MARIO_ROOT` if it is not the sibling directory.
 
 ```bash
 conda env create -f environment.yml
 conda activate giga_mario_bench
+export GIGA_MARIO_ROOT=../Giga_Mario
 ```
 
 `environment.yml` sets `PYTHONPATH=src`. Do not publish a pip-first install path.
@@ -25,8 +26,15 @@ conda activate giga_mario_bench
 ```bash
 giga_mario_bench --version
 giga_mario_bench
+giga_mario_bench build --bench reverse_complement --outdir out/bench
+giga_mario_bench traintestsplit --bench-dir out/bench --method random
+giga_mario_bench score prepare --all \
+  --data-out out/data --model-out out/models --score-out out/scores
+giga_mario_bench score exec
 python examples/toy/run.py
 ```
+
+The toy panel is 10 DNA sequences plus 10 mutants. Two pairs are zero-shot. Giga_Mario assigns the other 16 at random. Many-to-many RNN and encoder-decoder train until validation loss plateaus. Scores are macro F1, R2, and ROC AUC.
 
 ## Tests
 

@@ -1,0 +1,15 @@
+---
+description: Reuse Giga_Mario functions; the two repositories are one ecosystem
+alwaysApply: true
+---
+
+# Ecosystem reuse
+
+`giga_mario_bench` depends on [Giga_Mario](https://github.com/Sirius-Back/Giga_Mario). The two checkouts are one ecosystem.
+
+- Call an existing Giga_Mario function instead of copying it. Train/test/val assignment goes through `src.pipeline.split_predict.run_split_predict`.
+- A change may land in either repository, in the one that already owns that behavior.
+- New genomic model adapters belong in Giga_Mario when `parse_data` or its train wrappers already cover that role. This bench keeps only adapters Giga_Mario does not provide, and it still asks Giga_Mario for the split.
+- Prefer a previously debugged function over a new one.
+
+Read `CONTRIBUTING.md` before adding a feature or editing an existing one. Read the Giga_Mario wiki before changing a shared contract.

@@ -34,3 +34,12 @@ conda-bld/
 .snakemake/
 .Rproj.user/
 *.log
+examples/toy/out/
+examples/toy/data/toy_result.json
+.hydra/
+outputs/
+multirun/
+.nextflow*
+.nextflow.log*
+work/
+*.nf-log

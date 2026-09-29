@@ -1,19 +1,15 @@
-# Toy example
+# Toy reverse complement
 
-Runs giga_mario_bench with the current **baseline** implementation and checks that it works.
+`run.py` builds the default panel and trains both baseline models until validation loss plateaus.
 
-## Setup
-
-```bash
-conda env create -f ../../environment.yml
-conda activate giga_mario_bench
-cd examples/toy
-```
-
-## Run
+- 10 random ACGT sequences and 10 mutants at rate `0.1` (a range `low:high` or a comma-separated list draws one rate per mutant)
+- 2 pairs (4 sequences) are zero-shot
+- the other 16 sequences are assigned by Giga_Mario `type=random`
+- models: many-to-many bidirectional RNN and an encoder-decoder
+- scores: macro F1, R2 of probabilities against the true one-hot bases, macro ROC AUC
 
 ```bash
-python run.py
+python examples/toy/run.py
 ```
 
-Expected: exit code 0 and JSON with `"status": "baseline"` and `"ok": true`.
+Outputs land in `examples/toy/out/` (gitignored). A short JSON summary is written to `examples/toy/data/toy_result.json`.

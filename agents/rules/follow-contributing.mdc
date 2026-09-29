@@ -5,6 +5,8 @@ alwaysApply: true
 
 # Follow the contribution guide
 
+Before developing a new feature or editing an existing one, read `CONTRIBUTING.md` first.
+
 Any development in this repository must follow `CONTRIBUTING.md`:
 
 - architecture and testing layout

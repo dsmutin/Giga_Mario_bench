@@ -19,6 +19,10 @@ jobs:
         python-version: ["3.12"]
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: Sirius-Back/Giga_Mario
+          path: Giga_Mario
       - uses: conda-incubator/setup-miniconda@v3
         with:
           python-version: ${{ matrix.python-version }}
@@ -27,4 +31,6 @@ jobs:
           environment-file: environment.yml
       - name: Mandatory pytest
         timeout-minutes: 30
+        env:
+          GIGA_MARIO_ROOT: ${{ github.workspace }}/Giga_Mario
         run: pytest -m mandatory --tb=short

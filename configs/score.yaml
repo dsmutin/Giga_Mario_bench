@@ -1,0 +1,19 @@
+# Hydra config for `python -m giga_mario_bench.score.hydra_app`.
+defaults: []
+
+data_out: null
+model_out: null
+score_out: null
+bench: reverse_complement
+split: random
+model: null
+all: true
+max_epochs: 20
+patience: 5
+n_pairs: 10
+length: 16
+rate: 0.1
+seed: 42
+zsv_pairs: 2
+exec_root: null
+run: false

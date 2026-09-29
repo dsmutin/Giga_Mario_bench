@@ -6,5 +6,16 @@ dependencies:
   - setuptools
   - pytest
   - pytest-cov
+  - numpy
+  - pandas
+  - altair
+  - hydra-core
+  - omegaconf
+  - matplotlib
+  - pip
+  - pip:
+      - -e .
+      - cnsplots>=0.5.0
+      - vl-convert-python>=1.0
 variables:
   PYTHONPATH: src
