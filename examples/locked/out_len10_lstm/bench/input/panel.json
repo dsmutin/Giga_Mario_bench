@@ -1,0 +1,17 @@
+{
+  "bench": "reverse_complement",
+  "length": 10,
+  "max_length": 10,
+  "min_length": 10,
+  "mutation": "snp",
+  "n_pairs": 5000,
+  "n_sequences": 10000,
+  "rate": 0.1,
+  "seed": 42,
+  "split_ratios": [
+    1.0,
+    1.0,
+    1.0
+  ],
+  "zsv_pairs": 1000
+}

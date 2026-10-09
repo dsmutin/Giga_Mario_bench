@@ -268,8 +268,311 @@ class EncoderDecoder:
         self.opt.step(self.p, grads)
 
 
+def _sigmoid(z: np.ndarray) -> np.ndarray:
+    return 1.0 / (1.0 + np.exp(-np.clip(z, -40.0, 40.0)))
+
+
+def _lstm_pack(rng: np.random.Generator, hidden: int) -> dict[str, np.ndarray]:
+    """One LSTM: input, forget, cell, output gates stacked on axis 0.
+
+    The forget-gate bias starts at 1 so the cell is open at initialization.
+    """
+    bias = np.zeros(4 * hidden)
+    bias[hidden : 2 * hidden] = 1.0
+    return {
+        "W_x": _xavier(rng, 4 * hidden, N_BASE) * 0.5,
+        "W_h": _xavier(rng, 4 * hidden, hidden) * 0.5,
+        "b": bias,
+    }
+
+
+def _lstm_forward(
+    W_x: np.ndarray,
+    W_h: np.ndarray,
+    b: np.ndarray,
+    inputs: np.ndarray,
+    h0: np.ndarray,
+    c0: np.ndarray,
+) -> dict[str, np.ndarray]:
+    length, _features = inputs.shape
+    hidden = h0.shape[0]
+    h = h0
+    c = c0
+    states = np.zeros((length, hidden))
+    cells = np.zeros((length, hidden))
+    prev_h = np.zeros((length, hidden))
+    prev_c = np.zeros((length, hidden))
+    forget = np.zeros((length, hidden))
+    ingate = np.zeros((length, hidden))
+    cell_in = np.zeros((length, hidden))
+    outgate = np.zeros((length, hidden))
+    for t in range(length):
+        prev_h[t] = h
+        prev_c[t] = c
+        z = W_x @ inputs[t] + W_h @ h + b
+        f = _sigmoid(z[hidden : 2 * hidden])
+        i = _sigmoid(z[:hidden])
+        g = np.tanh(z[2 * hidden : 3 * hidden])
+        o = _sigmoid(z[3 * hidden :])
+        c = f * c + i * g
+        h = o * np.tanh(c)
+        states[t] = h
+        cells[t] = c
+        forget[t] = f
+        ingate[t] = i
+        cell_in[t] = g
+        outgate[t] = o
+    return {
+        "h": states,
+        "c": cells,
+        "h_prev": prev_h,
+        "c_prev": prev_c,
+        "f": forget,
+        "i": ingate,
+        "g": cell_in,
+        "o": outgate,
+    }
+
+
+def _lstm_bptt(
+    cache: dict[str, np.ndarray],
+    inputs: np.ndarray,
+    W_h: np.ndarray,
+    d_h: np.ndarray,
+    dh0: np.ndarray,
+    dc0: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """Backprop one LSTM. ``d_h`` is the output gradient at each step."""
+    length = inputs.shape[0]
+    hidden = d_h.shape[1]
+    dW_x = np.zeros((4 * hidden, inputs.shape[1]))
+    dW_h = np.zeros((4 * hidden, hidden))
+    db = np.zeros(4 * hidden)
+    dh_next = dh0
+    dc_next = dc0
+    for t in range(length - 1, -1, -1):
+        f = cache["f"][t]
+        i = cache["i"][t]
+        g = cache["g"][t]
+        o = cache["o"][t]
+        c = cache["c"][t]
+        tanh_c = np.tanh(c)
+        dh = d_h[t] + dh_next
+        dc = dc_next + dh * o * (1.0 - tanh_c**2)
+        df = dc * cache["c_prev"][t]
+        di = dc * g
+        dg = dc * i
+        do = dh * tanh_c
+        dz = np.concatenate(
+            [
+                di * i * (1.0 - i),
+                df * f * (1.0 - f),
+                dg * (1.0 - g**2),
+                do * o * (1.0 - o),
+            ]
+        )
+        dW_x += np.outer(dz, inputs[t])
+        dW_h += np.outer(dz, cache["h_prev"][t])
+        db += dz
+        dh_next = W_h.T @ dz
+        dc_next = dc * f
+    return dW_x, dW_h, db, dh_next, dc_next
+
+
+class ManyToManyLSTM:
+    """Bidirectional LSTM. Each position emits a base distribution.
+
+    The cell state is the change relative to the tanh Elman baseline: it can
+    carry a base across the reverse-complement lag. The loss stays per-base
+    cross-entropy.
+    """
+
+    kind = "many_to_many_lstm"
+
+    def __init__(self, hidden: int = 32, seed: int = 0, lr: float = 0.05) -> None:
+        rng = np.random.default_rng(seed)
+        self.hidden = hidden
+        forward = _lstm_pack(rng, hidden)
+        backward = _lstm_pack(rng, hidden)
+        self.p = {
+            "W_x_f": forward["W_x"],
+            "W_h_f": forward["W_h"],
+            "b_f": forward["b"],
+            "W_x_b": backward["W_x"],
+            "W_h_b": backward["W_h"],
+            "b_b": backward["b"],
+            "W_y": _xavier(rng, N_BASE, 2 * hidden) * 0.5,
+            "b_y": np.zeros(N_BASE),
+        }
+        self.opt = _Adam(self.p, lr)
+
+    def _directions(self, one: np.ndarray) -> tuple[dict[str, np.ndarray], dict[str, np.ndarray]]:
+        hidden = self.hidden
+        zeros_h = np.zeros(hidden)
+        zeros_c = np.zeros(hidden)
+        forward = _lstm_forward(self.p["W_x_f"], self.p["W_h_f"], self.p["b_f"], one, zeros_h, zeros_c)
+        backward = _lstm_forward(
+            self.p["W_x_b"], self.p["W_h_b"], self.p["b_b"], one[::-1], zeros_h, zeros_c
+        )
+        return forward, backward
+
+    def forward(self, x_idx: np.ndarray) -> dict[str, np.ndarray]:
+        one = np.eye(N_BASE)[x_idx]
+        forward, backward = self._directions(one)
+        cat = np.concatenate([forward["h"], backward["h"][::-1]], axis=1)
+        return {"x": one, "fwd": forward, "bwd": backward, "probs": softmax(cat @ self.p["W_y"].T + self.p["b_y"])}
+
+    def loss_grad(
+        self, x_idx: np.ndarray, y_idx: np.ndarray
+    ) -> tuple[float, dict[str, np.ndarray], np.ndarray]:
+        cache = self.forward(x_idx)
+        length = len(x_idx)
+        hidden = self.hidden
+        probs = cache["probs"]
+        loss = _ce(probs, y_idx)
+        dlogit = probs.copy()
+        dlogit[np.arange(length), y_idx] -= 1.0
+        dlogit /= length
+        cat = np.concatenate([cache["fwd"]["h"], cache["bwd"]["h"][::-1]], axis=1)
+        grads = {key: np.zeros_like(value) for key, value in self.p.items()}
+        grads["W_y"] = dlogit.T @ cat
+        grads["b_y"] = dlogit.sum(axis=0)
+        dcat = dlogit @ self.p["W_y"]
+        zeros = np.zeros(hidden)
+        grads["W_x_f"], grads["W_h_f"], grads["b_f"], _dh, _dc = _lstm_bptt(
+            cache["fwd"], cache["x"], self.p["W_h_f"], dcat[:, :hidden], zeros, zeros
+        )
+        grads["W_x_b"], grads["W_h_b"], grads["b_b"], _dh, _dc = _lstm_bptt(
+            cache["bwd"], cache["x"][::-1], self.p["W_h_b"], dcat[:, hidden:][::-1], zeros, zeros
+        )
+        return loss, grads, probs
+
+    def predict_proba(self, x_idx: np.ndarray) -> np.ndarray:
+        return self.forward(x_idx)["probs"]
+
+    def apply_grad(self, grads: dict[str, np.ndarray]) -> None:
+        self.opt.step(self.p, grads)
+
+
+class EncoderDecoderLSTM:
+    """LSTM encoder-decoder. Training loss is teacher-forced cross-entropy.
+
+    Free-run ``predict_proba`` feeds its own argmax back into the decoder.
+    The decoder starts from the encoder's final hidden state and cell.
+    """
+
+    kind = "encoder_decoder_lstm"
+
+    def __init__(self, hidden: int = 32, seed: int = 0, lr: float = 0.05) -> None:
+        rng = np.random.default_rng(seed)
+        self.hidden = hidden
+        enc = _lstm_pack(rng, hidden)
+        dec = _lstm_pack(rng, hidden)
+        self.p = {
+            "W_x": enc["W_x"],
+            "W_h": enc["W_h"],
+            "b": enc["b"],
+            "W_x_d": dec["W_x"],
+            "W_h_d": dec["W_h"],
+            "b_d": dec["b"],
+            "W_y": _xavier(rng, N_BASE, hidden) * 0.5,
+            "b_y": np.zeros(N_BASE),
+        }
+        self.opt = _Adam(self.p, lr)
+
+    def _encode(self, one: np.ndarray) -> dict[str, np.ndarray]:
+        hidden = self.hidden
+        return _lstm_forward(
+            self.p["W_x"], self.p["W_h"], self.p["b"], one, np.zeros(hidden), np.zeros(hidden)
+        )
+
+    def _decode(
+        self, h0: np.ndarray, c0: np.ndarray, y_idx: np.ndarray | None, length: int
+    ) -> tuple[dict[str, np.ndarray], np.ndarray, np.ndarray]:
+        inputs = np.zeros((length, N_BASE))
+        prev = np.zeros(N_BASE)
+        hidden = self.hidden
+        h = h0.copy()
+        c = c0.copy()
+        states = np.zeros((length, hidden))
+        cells = np.zeros((length, hidden))
+        prev_h = np.zeros((length, hidden))
+        prev_c = np.zeros((length, hidden))
+        forget = np.zeros((length, hidden))
+        ingate = np.zeros((length, hidden))
+        cell_in = np.zeros((length, hidden))
+        outgate = np.zeros((length, hidden))
+        for t in range(length):
+            inputs[t] = prev
+            prev_h[t] = h
+            prev_c[t] = c
+            z = self.p["W_x_d"] @ prev + self.p["W_h_d"] @ h + self.p["b_d"]
+            f = _sigmoid(z[hidden : 2 * hidden])
+            i = _sigmoid(z[:hidden])
+            g = np.tanh(z[2 * hidden : 3 * hidden])
+            o = _sigmoid(z[3 * hidden :])
+            c = f * c + i * g
+            h = o * np.tanh(c)
+            states[t] = h
+            cells[t] = c
+            forget[t] = f
+            ingate[t] = i
+            cell_in[t] = g
+            outgate[t] = o
+            if y_idx is not None and t + 1 < length:
+                prev = np.eye(N_BASE)[y_idx[t]]
+            elif y_idx is None:
+                logit = self.p["W_y"] @ h + self.p["b_y"]
+                prev = np.eye(N_BASE)[int(np.argmax(logit))]
+        cache = {
+            "h": states,
+            "c": cells,
+            "h_prev": prev_h,
+            "c_prev": prev_c,
+            "f": forget,
+            "i": ingate,
+            "g": cell_in,
+            "o": outgate,
+        }
+        return cache, inputs, softmax(states @ self.p["W_y"].T + self.p["b_y"])
+
+    def loss_grad(
+        self, x_idx: np.ndarray, y_idx: np.ndarray
+    ) -> tuple[float, dict[str, np.ndarray], np.ndarray]:
+        one = np.eye(N_BASE)[x_idx]
+        enc = self._encode(one)
+        dec, inputs, probs = self._decode(enc["h"][-1], enc["c"][-1], y_idx, len(x_idx))
+        length = len(x_idx)
+        hidden = self.hidden
+        loss = _ce(probs, y_idx)
+        dlogit = probs.copy()
+        dlogit[np.arange(length), y_idx] -= 1.0
+        dlogit /= length
+        grads = {key: np.zeros_like(value) for key, value in self.p.items()}
+        grads["W_y"] = dlogit.T @ dec["h"]
+        grads["b_y"] = dlogit.sum(axis=0)
+        d_h = dlogit @ self.p["W_y"]
+        grads["W_x_d"], grads["W_h_d"], grads["b_d"], dh0, dc0 = _lstm_bptt(
+            dec, inputs, self.p["W_h_d"], d_h, np.zeros(hidden), np.zeros(hidden)
+        )
+        d_enc = np.zeros((length, hidden))
+        grads["W_x"], grads["W_h"], grads["b"], _dh, _dc = _lstm_bptt(
+            enc, one, self.p["W_h"], d_enc, dh0, dc0
+        )
+        return loss, grads, probs
+
+    def predict_proba(self, x_idx: np.ndarray) -> np.ndarray:
+        one = np.eye(N_BASE)[x_idx]
+        enc = self._encode(one)
+        _cache, _inputs, probs = self._decode(enc["h"][-1], enc["c"][-1], None, len(x_idx))
+        return probs
+
+    def apply_grad(self, grads: dict[str, np.ndarray]) -> None:
+        self.opt.step(self.p, grads)
+
+
 def per_character_f1(
-    model: ManyToManyRNN | EncoderDecoder,
+    model: ManyToManyRNN | EncoderDecoder | ManyToManyLSTM | EncoderDecoderLSTM,
     pairs: list[tuple[np.ndarray, np.ndarray]],
 ) -> float:
     """Macro F1 of argmax outputs, counted once per character."""
@@ -287,7 +590,7 @@ def per_character_f1(
 
 
 def fit_plateau(
-    model: ManyToManyRNN | EncoderDecoder,
+    model: ManyToManyRNN | EncoderDecoder | ManyToManyLSTM | EncoderDecoderLSTM,
     train: list[tuple[np.ndarray, np.ndarray]],
     val: list[tuple[np.ndarray, np.ndarray]],
     *,
@@ -370,7 +673,11 @@ def fit_plateau(
     )
 
 
-def finite_difference_ok(model: ManyToManyRNN | EncoderDecoder, key: str, eps: float = 1e-5) -> float:
+def finite_difference_ok(
+    model: ManyToManyRNN | EncoderDecoder | ManyToManyLSTM | EncoderDecoderLSTM,
+    key: str,
+    eps: float = 1e-5,
+) -> float:
     """Return the max absolute error between analytical and numeric gradients."""
     rng = np.random.default_rng(1)
     x_idx = rng.integers(0, N_BASE, size=4)

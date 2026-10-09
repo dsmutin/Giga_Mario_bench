@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
 """Train both baselines on the locked reverse-complement panel.
 
-The panel is ``resolve_panel(None)``: 10_000 sequences of length 100, SNP
-rate 0.1, 1_000 pairs held out as zero-shot, and the other 8_000 sequences
-split evenly across train, test, and val. Curves record loss and
-per-character macro F1 each epoch. The last epoch and the best validation-loss
-checkpoint are scored on train, val, test, and zero-shot.
+Same protocol as the length-100 run: 10_000 sequences, SNP rate 0.1, 1_000
+pairs held out as zero-shot, the other 8_000 split evenly across train, test,
+and val, hidden 32, 40 epochs. This invocation fixes the length at 10.
+Length-100 artifacts stay in ``out/``. Research on why length 100 did not
+move F1 is in ``research/research-report.md`` at the workspace root: the lag
+is the issue, not the token loss. Curves record loss and per-character macro
+F1 each epoch. The last epoch and the best validation-loss checkpoint are
+scored on train, val, test, and zero-shot.
 """
 
 from __future__ import annotations
@@ -28,16 +31,17 @@ from giga_mario_bench.bin.traintestsplit import split_from_bench  # noqa: E402
 from giga_mario_bench.io_utils import read_jsonl, read_pipe, write_json  # noqa: E402
 from giga_mario_bench.models.data_prepare.encode import decode_sequence, prepare_records  # noqa: E402
 from giga_mario_bench.models.general import MODELS  # noqa: E402
-from giga_mario_bench.models.seqmodels import EncoderDecoder, ManyToManyRNN, fit_plateau  # noqa: E402
+from giga_mario_bench.models.seqmodels import EncoderDecoderLSTM, ManyToManyLSTM, fit_plateau  # noqa: E402
 from giga_mario_bench.score.general import score_general  # noqa: E402
 
+LENGTH = 10
 HIDDEN = 32
 MAX_EPOCHS = 40
 PATIENCE = 40
-MODELS_TO_RUN = ("many_to_many_rnn", "encoder_decoder")
+MODELS_TO_RUN = ("many_to_many_lstm", "encoder_decoder_lstm")
 CLASSES = {
-    "many_to_many_rnn": ManyToManyRNN,
-    "encoder_decoder": EncoderDecoder,
+    "many_to_many_lstm": ManyToManyLSTM,
+    "encoder_decoder_lstm": EncoderDecoderLSTM,
 }
 
 
@@ -100,8 +104,8 @@ def _plot(history: dict, path: Path) -> None:
 
 def run() -> int:
     """Build the locked panel, train both models, and write curves plus split scores."""
-    spec = resolve_panel(None)
-    out = Path(__file__).resolve().parent / "out"
+    spec = resolve_panel({"length": LENGTH})
+    out = Path(__file__).resolve().parent / f"out_len{LENGTH}_lstm"
     out.mkdir(parents=True, exist_ok=True)
     progress_path = out / "progress.jsonl"
     bench_dir = out / "bench"
@@ -132,7 +136,8 @@ def run() -> int:
 
     summaries = []
     for name in MODELS_TO_RUN:
-        model = CLASSES[name](hidden=HIDDEN, seed=spec["seed"], lr=MODELS[name]["lr"])
+        registry_name = "many_to_many_rnn" if "many_to_many" in name else "encoder_decoder"
+        model = CLASSES[name](hidden=HIDDEN, seed=spec["seed"], lr=MODELS[registry_name]["lr"])
         best_params: dict[str, np.ndarray] = {}
 
         def on_epoch(epoch: int, is_best: bool, _model=model, _best=best_params, _name=name) -> None:
@@ -168,7 +173,8 @@ def run() -> int:
         history = {
             "model": name,
             "hidden": HIDDEN,
-            "lr": MODELS[name]["lr"],
+            "lr": MODELS[registry_name]["lr"],
+            "cell": "lstm",
             "stopped_reason": result.stopped_reason,
             "epochs_ran": result.epochs_ran,
             "best_epoch": result.best_epoch,

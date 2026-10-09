@@ -11,7 +11,13 @@ from giga_mario_bench.bench.data.random_cds import generate_pairs, parse_rate, s
 from giga_mario_bench.bench.reverse_complement.adaptor import answers_for, prediction_rows, reverse_complement
 from giga_mario_bench.bin.traintestsplit import split_from_bench
 from giga_mario_bench.io_utils import read_jsonl, read_pipe
-from giga_mario_bench.models.seqmodels import EncoderDecoder, ManyToManyRNN, finite_difference_ok
+from giga_mario_bench.models.seqmodels import (
+    EncoderDecoder,
+    EncoderDecoderLSTM,
+    ManyToManyLSTM,
+    ManyToManyRNN,
+    finite_difference_ok,
+)
 from giga_mario_bench.score.general import score_general
 from giga_mario_bench.vizualisation.metrics import plot_scores
 
@@ -150,6 +156,10 @@ def test_analytical_gradients_match_finite_differences() -> None:
     assert finite_difference_ok(rnn, "W_xh_f") < 1e-6
     assert finite_difference_ok(ed, "W_xh") < 1e-5
     assert finite_difference_ok(ed, "W_xh_d") < 1e-5
+    lstm = ManyToManyLSTM(hidden=3, seed=0)
+    ed_lstm = EncoderDecoderLSTM(hidden=3, seed=0)
+    assert finite_difference_ok(lstm, "W_h_f") < 1e-5
+    assert finite_difference_ok(ed_lstm, "W_h") < 1e-5
 
 
 def test_score_prepare_writes_a_cell_script(tmp_path: Path) -> None:
