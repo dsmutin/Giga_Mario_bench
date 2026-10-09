@@ -33,7 +33,10 @@ def split_methods(
 
     One method writes ``outdir/split.csv``. Several methods write
     ``outdir/<method>/split.csv``. Assignment is Giga_Mario split-predict.
-    Zero-shot ids are passed in ``fold.csv`` with fold ``zsv``.
+    Zero-shot ids are passed in ``fold.csv`` with fold ``zsv``; a held-out
+    pair contributes both the original and the mutant. ``ratios`` is
+    train, test, val for the remaining sequences. A ``role`` column
+    stratifies that assignment so originals and mutants share each split.
     """
     if not methods:
         raise ValueError("at least one split method is required")
@@ -56,14 +59,21 @@ def split_methods(
             continue
         id_csv = dest / "id.csv"
         fold_csv = dest / "fold.csv"
+        strat_csv = dest / "stratification.csv"
         write_pipe(id_csv, id_rows, ["ID"])
         write_pipe(fold_csv, fold_rows, ["ID", "fold"])
+        write_pipe(
+            strat_csv,
+            [{"ID": row["id"], "role": row["role"]} for row in records],
+            ["ID", "role"],
+        )
         produced = run_split_predict(
             outdir=dest,
             type=method,
             seed=seed,
             id_csv=id_csv,
             fold_csv=fold_csv,
+            stratification_csv=strat_csv,
             ratios=ratios,
         )
         print(f"wrote split {method}: {produced}")
@@ -78,16 +88,23 @@ def split_from_bench(
     *,
     seed: int = 42,
     zsv_pairs: int | None = None,
+    ratios: tuple[float, float, float] | None = None,
 ) -> dict[str, str]:
     """Read ``input/records.jsonl`` and assign splits beside that benchmark."""
     bench_dir = Path(bench_dir)
     records = read_jsonl(bench_dir / "input" / "records.jsonl")
     panel_path = bench_dir / "input" / "panel.json"
-    if zsv_pairs is None and panel_path.is_file():
-        zsv_pairs = int(read_json(panel_path).get("zsv_pairs", 2))
+    panel = read_json(panel_path) if panel_path.is_file() else {}
     if zsv_pairs is None:
-        zsv_pairs = 2
+        zsv_pairs = int(panel.get("zsv_pairs", 2))
+    if ratios is None and panel.get("split_ratios"):
+        ratios = tuple(float(item) for item in panel["split_ratios"])
     target = bench_dir / "splits" if outdir is None else Path(outdir)
     return split_methods(
-        records, target, methods, seed=seed, zsv_pairs=zsv_pairs
+        records,
+        target,
+        methods,
+        seed=seed,
+        zsv_pairs=zsv_pairs,
+        ratios=ratios,
     )

@@ -6,8 +6,11 @@ from pathlib import Path
 
 import pytest
 
-from giga_mario_bench.bench.build import build_one
+from giga_mario_bench.bench.build import build_one, resolve_panel
 from giga_mario_bench.bench.data.random_cds import generate_pairs, parse_rate, sample_rate
+from giga_mario_bench.bench.reverse_complement.adaptor import answers_for, prediction_rows, reverse_complement
+from giga_mario_bench.bin.traintestsplit import split_from_bench
+from giga_mario_bench.io_utils import read_jsonl, read_pipe
 from giga_mario_bench.models.seqmodels import EncoderDecoder, ManyToManyRNN, finite_difference_ok
 from giga_mario_bench.score.general import score_general
 from giga_mario_bench.vizualisation.metrics import plot_scores
@@ -50,6 +53,81 @@ def test_rate_choices_and_range() -> None:
     span = parse_rate((0.0, 0.3))
     value = sample_rate(span, rng)
     assert 0.0 <= value <= 0.3
+
+
+def test_default_panel_is_configurable() -> None:
+    """Locked panel: length 100, 8_000 in train/test/val, 2_000 zero-shot."""
+    panel = resolve_panel(None)
+    assert panel["n_sequences"] == 10_000
+    assert panel["n_pairs"] == 5_000
+    assert panel["length"] == 100
+    assert panel["zsv_pairs"] == 1_000
+    assert panel["rate"] == 0.1
+    assert panel["mutation"] == "snp"
+    assert panel["split_ratios"] == (1.0, 1.0, 1.0)
+    fixed = resolve_panel({"n_pairs": 10, "length": 16, "zsv_pairs": 2})
+    assert fixed["n_sequences"] == 20
+    assert fixed["min_length"] == fixed["max_length"] == 16
+    assert fixed["zsv_pairs"] == 2
+
+
+def test_snp_mutant_uses_its_own_reverse_complement(tmp_path: Path) -> None:
+    """Mutants stay the same length, and the label is that mutant's complement."""
+    spec = {"n_pairs": 15, "length": 100, "rate": 0.1, "seed": 2, "zsv_pairs": 3}
+    built = build_one("reverse_complement", tmp_path / "bench", spec=spec)
+    assert built["status"] == "built"
+    records = read_jsonl(tmp_path / "bench" / "input" / "records.jsonl")
+    answers = {row["id"]: row["sequence"] for row in answers_for(records)}
+    by_pair: dict[str, dict[str, dict]] = {}
+    for row in records:
+        by_pair.setdefault(row["pair_id"], {})[row["role"]] = row
+        assert len(row["sequence"]) == 100
+    changed = 0
+    for pair in by_pair.values():
+        original = pair["original"]["sequence"]
+        mutant = pair["mutant"]["sequence"]
+        assert len(mutant) == len(original)
+        changed += int(mutant != original)
+        assert answers[pair["mutant"]["id"]] == reverse_complement(mutant)
+        assert answers[pair["original"]["id"]] == reverse_complement(original)
+        if mutant != original:
+            assert answers[pair["mutant"]["id"]] != reverse_complement(original)
+    assert changed == len(by_pair)
+    written = split_from_bench(tmp_path / "bench", tmp_path / "bench" / "splits", ["random"], seed=2)
+    assigned = read_pipe(Path(written["random"]))
+    role = {row["id"]: row["role"] for row in records}
+    pair_of = {row["id"]: row["pair_id"] for row in records}
+    buckets: dict[str, list[str]] = {}
+    for row in assigned:
+        buckets.setdefault(row["train_test"], []).append(row["ID"])
+    assert len(buckets["zsv"]) == 6
+    zsv_pairs = {pair_of[item] for item in buckets["zsv"]}
+    assert len(zsv_pairs) == 3
+    for name in ("train", "val", "test"):
+        roles = {role[item] for item in buckets[name]}
+        assert roles == {"original", "mutant"}
+        assert all(pair_of[item] not in zsv_pairs for item in buckets[name])
+    assert all(pair_of[item] in zsv_pairs for item in buckets["zsv"])
+
+
+def test_algorithmic_reverse_complement_f1() -> None:
+    """Exact reverse complement scores F1 1; a copy of the input does not."""
+    records = generate_pairs(n_pairs=40, min_length=4, max_length=30, rate=0.1, seed=1)
+    assert len(records) == 80
+    lengths = [row["length"] for row in records]
+    assert min(lengths) >= 4 and max(lengths) <= 30
+    exact = score_general(prediction_rows(records, reverse_complement))
+    assert exact["f1"] == pytest.approx(1.0)
+    assert exact["r2"] == pytest.approx(1.0)
+    assert exact["rocauc"] == pytest.approx(1.0)
+    assert exact["n_tokens"] == sum(lengths)
+    copied = score_general(prediction_rows(records, lambda sequence: sequence))
+    assert copied["f1"] < 0.45
+    complement_only = str.maketrans("ACGT", "TGCA")
+    partial = score_general(
+        prediction_rows(records, lambda sequence: sequence.translate(complement_only))
+    )
+    assert partial["f1"] < 0.99
 
 
 def test_score_general_perfect_prediction() -> None:

@@ -12,25 +12,62 @@ from giga_mario_bench.baseline import run_pipeline
 
 
 def _spec_from_args(args: argparse.Namespace) -> dict:
-    return {
+    spec = {
+        "n_sequences": args.n_sequences,
         "n_pairs": args.n_pairs,
+        "min_length": args.min_length,
+        "max_length": args.max_length,
         "length": args.length,
         "rate": args.rate,
         "seed": args.seed,
         "zsv_pairs": args.zsv_pairs,
     }
+    return {key: value for key, value in spec.items() if value is not None}
 
 
 def _add_panel_args(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument("--n-pairs", type=int, default=10)
-    parser.add_argument("--length", type=int, default=16)
+    parser.add_argument(
+        "--n-sequences",
+        type=int,
+        default=None,
+        help="individual sequences, originals plus mutants (default 10000)",
+    )
+    parser.add_argument(
+        "--n-pairs",
+        type=int,
+        default=None,
+        help="pair count; overrides --n-sequences (sequences = 2 * pairs)",
+    )
+    parser.add_argument(
+        "--min-length",
+        type=int,
+        default=None,
+        help="shortest read, inclusive (default 100)",
+    )
+    parser.add_argument(
+        "--max-length",
+        type=int,
+        default=None,
+        help="longest read, inclusive (default 100)",
+    )
+    parser.add_argument(
+        "--length",
+        type=int,
+        default=None,
+        help="fixed read length; sets min and max to the same value",
+    )
     parser.add_argument(
         "--rate",
         default="0.1",
         help="mutation rate, a low:high range, or comma-separated choices",
     )
     parser.add_argument("--seed", type=int, default=42)
-    parser.add_argument("--zsv-pairs", type=int, default=2)
+    parser.add_argument(
+        "--zsv-pairs",
+        type=int,
+        default=None,
+        help="pairs held out as zero-shot, both members (default 20 percent of pairs)",
+    )
 
 
 def _emit(payload: dict, output: str) -> None:

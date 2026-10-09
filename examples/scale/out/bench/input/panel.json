@@ -1,0 +1,8 @@
+{
+  "bench": "reverse_complement",
+  "length": 32,
+  "n_pairs": 40,
+  "rate": 0.1,
+  "seed": 42,
+  "zsv_pairs": 4
+}

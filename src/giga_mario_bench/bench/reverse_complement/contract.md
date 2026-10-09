@@ -16,9 +16,19 @@ complement of held-out DNA.
 | `sequence` | ACGT string |
 | `rate` | mutation rate used for mutants; null for originals |
 
-Default toy panel: 10 originals, 10 mutants. Two pairs (4 sequences) are marked
-zero-shot later. The other 8 pairs (16 sequences) go through Giga_Mario
-`run_split_predict` (`type=random` unless another method is requested).
+Pipeline default (`bench.build.DEFAULT_SPEC`, CLI and `configs/score.yaml`):
+10_000 sequences of length 100. Mutations are SNPs at rate 0.1 (no indels).
+The label of each row is the reverse complement of that row's own sequence,
+so a mutant is labeled with the mutant complement. 1_000 pairs (1_000
+originals and 1_000 mutants) are zero-shot together. The other 4_000 originals
+and 4_000 mutants are assigned by Giga_Mario `random` with train:test:val
+weights 1:1:1, stratified by role. Flags: `--n-sequences`, `--n-pairs`,
+`--min-length`, `--max-length`, `--length`, `--zsv-pairs`, `--rate`. Omitted
+`zsv_pairs` is 20% of pairs.
+
+The toy example still uses 10 originals and 10 mutants of length 16, with 2
+pairs (4 sequences) zero-shot. The other 8 pairs (16 sequences) go through
+Giga_Mario `run_split_predict` (`type=random` unless another method is requested).
 
 ## Output
 

@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from giga_mario_bench.bench.build import BENCHES, DEFAULT_SPEC, param_slug
+from giga_mario_bench.bench.build import BENCHES, param_slug, resolve_panel
 from giga_mario_bench.giga_mario import repo_root
 from giga_mario_bench.models.general import MODELS, model_params_slug
 
@@ -56,9 +56,7 @@ def prepare_grid(
     or inside ``spec_json``.
     """
     loaded = _load_spec(spec_json, data_out, model_out, score_out)
-    panel = dict(DEFAULT_SPEC)
-    if spec:
-        panel.update(spec)
+    panel = resolve_panel(spec)
     if "benches" in loaded:
         benches = list(loaded["benches"])
     elif all_cells or bench is None:

@@ -59,11 +59,13 @@ CLI (giga_mario_bench.cli)
           → exec scripts and JSON scores
 
 tests/          mandatory, optional, and contracts
-examples/toy/   reverse-complement panel (10 + 10 sequences)
+examples/toy/   reverse-complement panel (10 + 10 sequences, fixed length 16)
 cite/           BibTeX for integrated tools
 wiki/           GitHub wiki (separate git repo)
 agents/         portable rules and skills (any IDE)
 ```
+
+The pipeline default panel is 10_000 sequences of length 100, SNP rate 0.1, with 2_000 zero-shot sequences and the rest split evenly across train, test, and val (`DEFAULT_SPEC`). The toy example stays at 10 + 10 sequences of length 16.
 
 The no-subcommand CLI still returns the baseline JSON keys `status`, `ok`, and `input_path`.
 

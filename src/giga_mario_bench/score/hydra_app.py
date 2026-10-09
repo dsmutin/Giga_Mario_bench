@@ -16,13 +16,15 @@ def main(cfg: DictConfig) -> None:
     """Prepare the score grid from a Hydra config. Run it when ``run=true``."""
     if not cfg.data_out or not cfg.model_out or not cfg.score_out:
         raise ValueError("data_out, model_out, and score_out are required")
-    spec = {
-        "n_pairs": int(cfg.n_pairs),
-        "length": int(cfg.length),
-        "rate": cfg.rate,
-        "seed": int(cfg.seed),
-        "zsv_pairs": int(cfg.zsv_pairs),
-    }
+    spec: dict = {"rate": cfg.rate, "seed": int(cfg.seed)}
+    for key in ("n_sequences", "n_pairs", "min_length", "max_length", "length", "zsv_pairs"):
+        value = cfg.get(key)
+        if value is None or str(value) == "null":
+            continue
+        spec[key] = int(value)
+    ratios = cfg.get("split_ratios")
+    if ratios is not None and str(ratios) != "null":
+        spec["split_ratios"] = [float(item) for item in ratios]
     prepare_grid(
         data_out=Path(str(cfg.data_out)),
         model_out=Path(str(cfg.model_out)),

@@ -34,7 +34,7 @@ giga_mario_bench score exec
 python examples/toy/run.py
 ```
 
-The toy panel is 10 DNA sequences plus 10 mutants. Two pairs are zero-shot. Giga_Mario assigns the other 16 at random. Many-to-many RNN and encoder-decoder train until validation loss plateaus. Scores are macro F1, R2, and ROC AUC.
+The pipeline default panel is 10_000 sequences of length 100. Mutations are SNPs at rate 0.1. Each label is the reverse complement of that sequence. 1_000 pairs are zero-shot (1_000 originals and 1_000 mutants). The other 4_000 originals and 4_000 mutants are split evenly across train, test, and val. The toy example is smaller: 10 DNA sequences plus 10 mutants of length 16, two pairs zero-shot. Many-to-many RNN and encoder-decoder train until validation loss plateaus. Scores are macro F1, R2, and ROC AUC. An exact reverse-complement predictor scores F1 1.
 
 ## Tests
 

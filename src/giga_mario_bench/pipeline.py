@@ -9,7 +9,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from giga_mario_bench.bench.build import build_one, param_slug
+from giga_mario_bench.bench.build import build_one, param_slug, resolve_panel
 from giga_mario_bench.bin.traintestsplit import split_from_bench
 from giga_mario_bench.io_utils import read_jsonl, write_json, write_jsonl
 from giga_mario_bench.models.data_prepare.encode import prepare_records
@@ -38,6 +38,7 @@ def run_cell(
     spec = dict(spec)
     if seed is not None:
         spec["seed"] = seed
+    spec = resolve_panel(spec)
     slug = param_slug(spec)
     model_slug = model_params_slug(model, hidden)
     bench_dir = Path(data_out) / bench / slug
@@ -63,12 +64,14 @@ def run_cell(
     if split_csv.is_file():
         print(f"split already present: {split_csv}")
     else:
+        ratios = spec.get("split_ratios")
         split_from_bench(
             bench_dir,
             split_dir,
             [split],
             seed=int(spec["seed"]),
             zsv_pairs=int(spec.get("zsv_pairs", 2)),
+            ratios=tuple(float(item) for item in ratios) if ratios else None,
         )
 
     checkpoint_dir = (

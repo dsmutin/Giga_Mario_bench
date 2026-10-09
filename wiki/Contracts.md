@@ -18,7 +18,8 @@ Change a row only together with tests and with this page.
 | Reverse-complement answers | `bench/reverse_complement/adaptor.py` |
 | Model-ready rows | `models/data_prepare`: `x` and `y` integer lists, `A=0,C=1,G=2,T=3` |
 | Split | Giga_Mario `src.pipeline.split_predict.run_split_predict`. Output `split.csv` columns `ID\|train_test\|fold`. Fold `zsv` is held out. Several `--methods` use one subdirectory each |
-| Toy panel counts | 10 originals + 10 mutants; 2 pairs (4 sequences) `zsv`; 16 sequences assigned; train, val, and test all non-empty |
+| Pipeline panel default | `DEFAULT_SPEC`: 10_000 sequences, length 100, SNP rate 0.1. 1_000 pairs (2_000 sequences) are `zsv`. The other 8_000 are train/test/val at 1:1:1, stratified by original vs mutant. Label is the reverse complement of that sequence |
+| Toy panel counts | 10 originals + 10 mutants, fixed length 16; 2 pairs (4 sequences) `zsv`; 16 sequences assigned; train, val, and test all non-empty |
 | Train until plateau | `models.seqmodels.fit_plateau`. Stop reason `plateau` or `max_epochs`. Best validation weights restored |
 | Scores | `score.general.score_general`: macro F1 from the 4×4 count matrix, R2 of true one-hot vs probabilities, macro one-vs-rest ROC AUC |
 | Figures | `vizualisation.metrics.plot_scores` (Altair HTML, cnsplots PNG when installed) |

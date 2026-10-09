@@ -1,8 +1,10 @@
 """randomCDS: random DNA strings and point-mutated partners.
 
-The toy panel is 10 originals plus 10 mutants. Split assignment later holds
-out 2 pairs (4 sequences) as zero-shot and assigns the other 16 sequences
-with Giga_Mario.
+The locked pipeline panel is 10_000 sequences of length 100
+(``bench.build.DEFAULT_SPEC``): 4_000 originals and 4_000 mutants for
+train/test/val, and 1_000 originals plus 1_000 mutants held out as zero-shot
+pairs. The toy example still asks for 10 originals plus 10 mutants of fixed
+length 16. Mutations are substitutions only.
 """
 
 from __future__ import annotations
@@ -52,7 +54,11 @@ def sample_rate(spec: tuple[Any, ...], rng: np.random.Generator) -> float:
 
 
 def mutate(sequence: str, rate: float, rng: np.random.Generator) -> str:
-    """Substitute each base independently with probability ``rate``."""
+    """Apply SNP substitutions. Insertions and deletions are not used.
+
+    Each site changes independently with probability ``rate`` to one of the
+    other three bases. The mutant has the same length as the original.
+    """
     if not 0.0 <= rate <= 1.0:
         raise ValueError(f"mutation rate must be in [0, 1], got {rate}")
     chars = []
@@ -67,25 +73,46 @@ def mutate(sequence: str, rate: float, rng: np.random.Generator) -> str:
 
 def generate_pairs(
     *,
-    n_pairs: int = 10,
-    length: int = 16,
+    n_pairs: int | None = None,
+    length: int | None = None,
     rate: Any = 0.1,
     seed: int = 42,
+    n_sequences: int | None = None,
+    min_length: int | None = None,
+    max_length: int | None = None,
 ) -> list[dict[str, Any]]:
-    """Build ``n_pairs`` originals and ``n_pairs`` mutants.
+    """Build originals and point-mutated partners.
 
-    Identifiers are ``pXX_orig`` and ``pXX_mut`` sharing ``pair_id`` ``pXX``.
+    Omitted size arguments use ``resolve_panel`` (10_000 sequences, length
+    100). ``length`` fixes every read. ``n_pairs`` counts pairs, so the row
+    count is ``2 * n_pairs``. Identifiers are ``pXX_orig`` and ``pXX_mut``.
+    A read length is drawn uniformly from ``min_length`` to ``max_length``
+    inclusive; the locked default sets both ends to 100.
     """
-    if n_pairs < 3:
-        raise ValueError("n_pairs must be >= 3 so a train/val/test split can drop two zero-shot pairs")
-    if length < 2:
-        raise ValueError("length must be >= 2")
-    spec = parse_rate(rate)
-    rng = np.random.default_rng(seed)
+    from giga_mario_bench.bench.build import resolve_panel
+
+    panel = resolve_panel(
+        {
+            "n_pairs": n_pairs,
+            "n_sequences": n_sequences,
+            "length": length,
+            "min_length": min_length,
+            "max_length": max_length,
+            "rate": rate,
+            "seed": seed,
+        }
+    )
+    n_pairs = int(panel["n_pairs"])
+    min_length = int(panel["min_length"])
+    max_length = int(panel["max_length"])
+    spec = parse_rate(panel["rate"])
+    rng = np.random.default_rng(int(panel["seed"]))
+    width = max(2, len(str(n_pairs - 1)))
     rows: list[dict[str, Any]] = []
     for index in range(n_pairs):
-        pair_id = f"p{index:02d}"
-        original = "".join(ALPHABET[int(i)] for i in rng.integers(0, 4, size=length))
+        pair_id = f"p{index:0{width}d}"
+        read_length = int(rng.integers(min_length, max_length + 1))
+        original = "".join(ALPHABET[int(i)] for i in rng.integers(0, 4, size=read_length))
         drawn = sample_rate(spec, rng)
         mutant = mutate(original, drawn, rng)
         rows.append(
@@ -95,7 +122,7 @@ def generate_pairs(
                 "role": "original",
                 "sequence": original,
                 "rate": None,
-                "length": length,
+                "length": read_length,
             }
         )
         rows.append(
@@ -105,7 +132,7 @@ def generate_pairs(
                 "role": "mutant",
                 "sequence": mutant,
                 "rate": drawn,
-                "length": length,
+                "length": read_length,
             }
         )
     return rows

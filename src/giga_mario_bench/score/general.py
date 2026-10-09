@@ -58,6 +58,19 @@ def score_general(rows: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
+def character_macro_f1(y_true: np.ndarray, y_pred: np.ndarray) -> float:
+    """Macro F1 over bases, one count per output character."""
+    truth = np.asarray(y_true, dtype=int).ravel()
+    pred = np.asarray(y_pred, dtype=int).ravel()
+    if truth.shape != pred.shape:
+        raise ValueError("y_true and y_pred must have the same number of characters")
+    if truth.size == 0:
+        raise ValueError("character_macro_f1 received no characters")
+    matrix = np.zeros((4, 4), dtype=int)
+    np.add.at(matrix, (truth, pred), 1)
+    return macro_f1(matrix)
+
+
 def macro_f1(matrix: np.ndarray) -> float:
     """Macro F1 over bases that appear at least once as the true label."""
     scores: list[float] = []

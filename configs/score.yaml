@@ -10,10 +10,14 @@ model: null
 all: true
 max_epochs: 20
 patience: 5
-n_pairs: 10
-length: 16
+n_sequences: 10000
+n_pairs: null
+min_length: 100
+max_length: 100
+length: 100
 rate: 0.1
 seed: 42
-zsv_pairs: 2
+zsv_pairs: null
+split_ratios: [1, 1, 1]
 exec_root: null
 run: false

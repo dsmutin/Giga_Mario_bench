@@ -7,8 +7,9 @@ Gradients are analytical (BPTT). Adam updates the parameters.
 from __future__ import annotations
 
 import math
+from collections.abc import Callable
 from copy import deepcopy
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import numpy as np
 
@@ -29,12 +30,19 @@ def _xavier(rng: np.random.Generator, rows: int, cols: int) -> np.ndarray:
 
 @dataclass
 class TrainResult:
-    """Plateau training summary."""
+    """Plateau training summary.
+
+    ``train_f1`` and ``val_f1`` are per-character macro F1 of the emitted
+    sequence (argmax over the output distribution, not teacher-forced tokens).
+    """
 
     train_loss: list[float]
     val_loss: list[float]
     stopped_reason: str
     epochs_ran: int
+    train_f1: list[float] = field(default_factory=list)
+    val_f1: list[float] = field(default_factory=list)
+    best_epoch: int = 0
 
 
 class _Adam:
@@ -260,6 +268,24 @@ class EncoderDecoder:
         self.opt.step(self.p, grads)
 
 
+def per_character_f1(
+    model: ManyToManyRNN | EncoderDecoder,
+    pairs: list[tuple[np.ndarray, np.ndarray]],
+) -> float:
+    """Macro F1 of argmax outputs, counted once per character."""
+    from giga_mario_bench.score.general import character_macro_f1
+
+    if not pairs:
+        return float("nan")
+    truth_parts: list[np.ndarray] = []
+    pred_parts: list[np.ndarray] = []
+    for x_idx, y_idx in pairs:
+        pred = np.argmax(model.predict_proba(x_idx), axis=1)
+        truth_parts.append(np.asarray(y_idx, dtype=int))
+        pred_parts.append(pred.astype(int))
+    return character_macro_f1(np.concatenate(truth_parts), np.concatenate(pred_parts))
+
+
 def fit_plateau(
     model: ManyToManyRNN | EncoderDecoder,
     train: list[tuple[np.ndarray, np.ndarray]],
@@ -269,21 +295,31 @@ def fit_plateau(
     patience: int = 4,
     min_delta: float = 1e-4,
     seed: int = 0,
+    restore_best: bool = True,
+    on_epoch: Callable[[int, bool], None] | None = None,
 ) -> TrainResult:
-    """Train until validation loss stops improving, then restore the best weights."""
+    """Train until validation loss stops improving, then restore the best weights.
+
+    Per-character F1 is recorded after each epoch on the weights of that epoch.
+    ``on_epoch`` receives the 1-based epoch index and whether it is the best
+    validation loss so far. Set ``restore_best=False`` to keep the last epoch.
+    """
     if not train:
         raise ValueError("train split is empty")
     monitor = val if val else train
     best = math.inf
     best_params = deepcopy(model.p)
+    best_epoch = 0
     wait = 0
     train_hist: list[float] = []
     val_hist: list[float] = []
+    train_f1: list[float] = []
+    val_f1: list[float] = []
     reason = "max_epochs"
     rng = np.random.default_rng(seed)
     epochs_ran = 0
-    for epoch in range(max_epochs):
-        epochs_ran = epoch + 1
+    for _epoch in range(max_epochs):
+        epochs_ran += 1
         order = rng.permutation(len(train))
         total = 0.0
         for index in order:
@@ -294,22 +330,44 @@ def fit_plateau(
         train_hist.append(total / len(train))
         val_loss = 0.0
         for x_idx, y_idx in monitor:
-            # Recompute loss without a second parameter update.
             loss, _grads, _probs = model.loss_grad(x_idx, y_idx)
             val_loss += loss
         val_loss /= len(monitor)
         val_hist.append(val_loss)
-        if val_loss < best - min_delta:
+        train_f1.append(per_character_f1(model, train))
+        val_f1.append(per_character_f1(model, val) if val else float("nan"))
+        is_best = val_loss < best - min_delta
+        if is_best:
             best = val_loss
             best_params = deepcopy(model.p)
+            best_epoch = epochs_ran
             wait = 0
         else:
             wait += 1
-            if wait >= patience:
-                reason = "plateau"
-                break
-    model.p = best_params
-    return TrainResult(train_hist, val_hist, reason, epochs_ran)
+        model._epoch_trace = {
+            "epoch": epochs_ran,
+            "train_loss": train_hist[-1],
+            "val_loss": val_hist[-1],
+            "train_f1": train_f1[-1],
+            "val_f1": val_f1[-1],
+            "is_best": is_best,
+        }
+        if on_epoch is not None:
+            on_epoch(epochs_ran, is_best)
+        if not is_best and wait >= patience:
+            reason = "plateau"
+            break
+    if restore_best:
+        model.p = best_params
+    return TrainResult(
+        train_hist,
+        val_hist,
+        reason,
+        epochs_ran,
+        train_f1,
+        val_f1,
+        best_epoch,
+    )
 
 
 def finite_difference_ok(model: ManyToManyRNN | EncoderDecoder, key: str, eps: float = 1e-5) -> float:

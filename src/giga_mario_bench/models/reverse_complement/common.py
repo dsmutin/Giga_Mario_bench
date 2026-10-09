@@ -75,6 +75,9 @@ def train_model(
         "epochs_ran": result.epochs_ran,
         "train_loss": result.train_loss,
         "val_loss": result.val_loss,
+        "train_f1": result.train_f1,
+        "val_f1": result.val_f1,
+        "best_epoch": result.best_epoch,
         "checkpoint": str(weights),
     }
     write_json(history_path, payload)
